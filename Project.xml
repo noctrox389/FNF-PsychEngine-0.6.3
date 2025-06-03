@@ -28,6 +28,9 @@
         <android target-sdk-version="33" />
         <android min-sdk-version="23" /> <!-- Mínimo recomendado para MANAGE_EXTERNAL_STORAGE -->
         <android install="33" />
+            <!-- Configuración de Gradle -->
+    <config:android gradle-version="8.1.2" />
+    <config:android gradle-plugin-version="8.1.0" />
 
         <!-- Permisos necesarios -->
         <config:android permission="android.permission.MANAGE_EXTERNAL_STORAGE"/>
@@ -46,6 +49,7 @@
         <config:android application-element='android:preserveLegacyExternalStorage="true"' />
         
         <!-- Definiciones necesarias -->
+            <dependency name="extension-androidtools" />
         <haxedef name="ANDROID_TARGET" />
         <haxedef name="native-trace" />
         <dependency path="project.android" />
