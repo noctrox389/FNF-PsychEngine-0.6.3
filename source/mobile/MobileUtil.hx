@@ -1,13 +1,8 @@
 package mobile;
 
 #if android
-import android.os.Build.VERSION;
-import android.os.Environment;
-import android.content.Context;
-import android.Permissions;
-import android.Settings;
+import lime.system.JNI;
 #end
-
 import haxe.io.Path;
 import lime.system.System;
 import lime.app.Application;
@@ -24,49 +19,79 @@ using StringTools;
 **/
 
 class MobileUtil {
-  public static var currentDirectory:String = null;
-  public static var path:String = '';
+    public static var currentDirectory:String = null;
+    public static var path:String = '';
 
-  public static function getDirectory():String {
-   #if android
-   currentDirectory = Environment.getExternalStorageDirectory() + '/.' + Application.current.meta.get('file');
-   #elseif ios
-   currentDirectory = System.applicationStorageDirectory;
-   #end
-  return currentDirectory;
-  }
+    public static function getDirectory():String {
+        #if android
+        currentDirectory = getExternalStorageDirectory() + '/.' + Application.current.meta.get('file');
+        #elseif ios
+        currentDirectory = System.applicationStorageDirectory;
+        #end
+        return currentDirectory;
+    }
 
     #if android
-    public static function getPermissions():Void
-    {
-    path = Path.addTrailingSlash(Environment.getExternalStorageDirectory() + '/.' + Application.current.meta.get('file'));
-  
-       if(VERSION.SDK_INT >= 33){
-		Permissions.requestPermissions(['READ_MEDIA_IMAGES', 'READ_MEDIA_VIDEO', 'READ_MEDIA_AUDIO']);
-	    if (!Environment.isExternalStorageManager()) {
-	    Settings.requestSetting('REQUEST_MANAGE_MEDIA');
-	    Settings.requestSetting('MANAGE_APP_ALL_FILES_ACCESS_PERMISSION');
-	    }
-      } else {
-        Permissions.requestPermissions(['READ_EXTERNAL_STORAGE', 'WRITE_EXTERNAL_STORAGE']);
-	  }
+    // Métodos JNI para acceder a funcionalidades de Android
+    private static var getExternalStorageDirectory_jni = JNI.createStaticMethod("android/os/Environment", "getExternalStorageDirectory", "()Ljava/io/File;");
+    private static var getAbsolutePath_jni = JNI.createStaticMethod("java/io/File", "getAbsolutePath", "()Ljava/lang/String;");
+    private static var getSdkInt_jni = JNI.createStaticMethod("android/os/Build$VERSION", "SDK_INT", "()I");
+    private static var requestPermissions_jni = JNI.createStaticMethod("org/haxe/lime/GameActivity", "requestPermissions", "([Ljava/lang/String;)V");
+    private static var isExternalStorageManager_jni = JNI.createStaticMethod("android/os/Environment", "isExternalStorageManager", "()Z");
+    private static var requestManageMedia_jni = JNI.createStaticMethod("org/haxe/extension/Permissions", "requestSetting", "(Ljava/lang/String;)V");
 
-    try {
-      if(!FileSystem.exists(MobileUtil.getDirectory()))
-        FileSystem.createDirectory(MobileUtil.getDirectory());
-     } catch (e:Dynamic) {
-    trace(e);
-    Application.current.window.alert("Seems like you didnt accepted the Permissions. Please accept them to be able to run the game.", 'Uncaught Error');
-     System.exit(0);
+    public static function getExternalStorageDirectory():String {
+        var file = getExternalStorageDirectory_jni();
+        return getAbsolutePath_jni(file);
     }
-  }
 
-	public static function save(fileName:String = 'Ye', fileExt:String = '.json', fileData:String = 'you didnt cooked, try again!')
-	{
-		if (!FileSystem.exists(MobileUtil.getDirectory() + 'saved-content'))
-			FileSystem.createDirectory(MobileUtil.getDirectory() + 'saved-content');
+    public static function getSdkInt():Int {
+        return getSdkInt_jni();
+    }
 
-		File.saveContent(MobileUtil.getDirectory() + 'saved-content/' + fileName + fileExt, fileData);
-	}
-  #end
+    public static function requestPermissions(permissions:Array<String>):Void {
+        requestPermissions_jni(permissions);
+    }
+
+    public static function isExternalStorageManager():Bool {
+        return isExternalStorageManager_jni();
+    }
+
+    public static function requestSetting(setting:String):Void {
+        requestManageMedia_jni(setting);
+    }
+
+    public static function getPermissions():Void {
+        path = Path.addTrailingSlash(getExternalStorageDirectory() + '/.' + Application.current.meta.get('file'));
+  
+        if(getSdkInt() >= 33) {
+            requestPermissions(['android.permission.READ_MEDIA_IMAGES', 
+                              'android.permission.READ_MEDIA_VIDEO', 
+                              'android.permission.READ_MEDIA_AUDIO']);
+            
+            if (!isExternalStorageManager()) {
+                requestSetting('MANAGE_EXTERNAL_STORAGE');
+            }
+        } else {
+            requestPermissions(['android.permission.READ_EXTERNAL_STORAGE', 
+                              'android.permission.WRITE_EXTERNAL_STORAGE']);
+        }
+
+        try {
+            if(!FileSystem.exists(getDirectory()))
+                FileSystem.createDirectory(getDirectory());
+        } catch (e:Dynamic) {
+            trace(e);
+            Application.current.window.alert("Seems like you didn't accept the Permissions. Please accept them to be able to run the game.", 'Uncaught Error');
+            System.exit(0);
+        }
+    }
+
+    public static function save(fileName:String = 'Ye', fileExt:String = '.json', fileData:String = 'you didnt cooked, try again!') {
+        if (!FileSystem.exists(getDirectory() + 'saved-content'))
+            FileSystem.createDirectory(getDirectory() + 'saved-content');
+
+        File.saveContent(getDirectory() + 'saved-content/' + fileName + fileExt, fileData);
+    }
+    #end
 }
