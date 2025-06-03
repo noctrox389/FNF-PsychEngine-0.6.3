@@ -1,58 +1,84 @@
 name: Android Build
+
 on: workflow_dispatch
+
 jobs:
   Build:
     runs-on: ubuntu-latest
     permissions:
-        contents: write
-        actions: write
+      contents: write
+      actions: write
+
     steps:
       - name: Checkout
-        uses: actions/checkout@main
+        uses: actions/checkout@v4
         with:
           submodules: true
+          fetch-depth: 0
 
-      - name: Setup Android NDK
-        id: setup-ndk
-        uses: nttld/setup-ndk@main
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
         with:
-          ndk-version: r25c
+          ndk-version: '25.2.9519653'  # Última versión estable
+          cmake-version: '3.22.1'
+          accept-android-licenses: true
 
       - name: Setup Java JDK
-        uses: actions/setup-java@main
+        uses: actions/setup-java@v3
         with:
-          distribution: 'zulu'
-          java-version: '11'
+          distribution: 'temurin'  # Más compatible con Android
+          java-version: '17'       # Requerido para Gradle 8+
 
       - name: Setup Haxe
-        uses: krdlab/setup-haxe@master
+        uses: krdlab/setup-haxe@v1
         with:
-          haxe-version: 4.3.4
+          haxe-version: '4.3.4'
+          neko-version: '2.3.0'
 
-      - name: Installing Libraries
+      - name: Install Dependencies
         run: |
+          # Configurar entorno
+          mkdir -p ~/haxelib
           haxelib setup ~/haxelib
-          haxelib install hmm --quiet
-          haxelib run hmm install --quiet
-          haxelib git hxcpp https://github.com/HaxeFoundation/hxcpp
+          
+          # Instalar dependencias esenciales
+          haxelib install lime --quiet
+          haxelib install hxcpp --quiet
+          haxelib install extension-androidtools --quiet
+          
+          # Reconstruir hxcpp
           haxelib run lime rebuild hxcpp
 
-      - name: Configure Android
+      - name: Configure Android Tools
         run: |
-          haxelib run lime setup -alias -y
-          haxelib run lime config ANDROID_SDK $ANDROID_HOME
-          haxelib run lime config ANDROID_NDK_ROOT $ANDROID_NDK_HOME
-          haxelib run lime config JAVA_HOME $JAVA_HOME
-          haxelib run lime config ANDROID_SETUP true
+          # Configurar paths
+          haxelib run lime setup android --force
+          haxelib run lime config ANDROID_SDK $ANDROID_SDK_ROOT
+          haxelib run lime config ANDROID_NDK_ROOT $ANDROID_NDK_ROOT
+          haxelib run lime config JAVA_HOME $JAVA_HOME_17_X64
+          
+          # Aceptar licencias
+          yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses
+          
+          # Instalar plataformas necesarias
+          $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
         env:
-          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+          ANDROID_NDK_ROOT: /usr/local/lib/android/sdk/ndk/25.2.9519653
 
-      - name: Building
-        run: haxelib run lime build android -final -D officialBuild
+      - name: Build Android APK
+        run: |
+          # Limpiar y construir
+          haxelib run lime clean android
+          haxelib run lime build android -final -D officialBuild -v
+          
+          # Mover APK a ubicación accesible
+          mkdir -p artifacts
+          cp export/release/android/bin/app/build/outputs/apk/release/*.apk artifacts/
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@main
+        uses: actions/upload-artifact@v3
         with:
-          name: Psych Engine Android
-          path: export/release/android/bin/app/build/outputs/apk/debug
-          if-no-files-found: warn
+          name: PsychEngine-Android
+          path: artifacts/*.apk
+          retention-days: 7
