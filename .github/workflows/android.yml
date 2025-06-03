@@ -19,15 +19,15 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          ndk-version: '25.2.9519653'  # Última versión estable
+          ndk-version: '25.2.9519653'
           cmake-version: '3.22.1'
           accept-android-licenses: true
 
       - name: Setup Java JDK
         uses: actions/setup-java@v3
         with:
-          distribution: 'temurin'  # Más compatible con Android
-          java-version: '17'       # Requerido para Gradle 8+
+          distribution: 'temurin'
+          java-version: '17'
 
       - name: Setup Haxe
         uses: krdlab/setup-haxe@v1
@@ -37,30 +37,20 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          # Configurar entorno
           mkdir -p ~/haxelib
           haxelib setup ~/haxelib
-          
-          # Instalar dependencias esenciales
           haxelib install lime --quiet
           haxelib install hxcpp --quiet
           haxelib install extension-androidtools --quiet
-          
-          # Reconstruir hxcpp
           haxelib run lime rebuild hxcpp
 
       - name: Configure Android Tools
         run: |
-          # Configurar paths
           haxelib run lime setup android --force
           haxelib run lime config ANDROID_SDK $ANDROID_SDK_ROOT
           haxelib run lime config ANDROID_NDK_ROOT $ANDROID_NDK_ROOT
           haxelib run lime config JAVA_HOME $JAVA_HOME_17_X64
-          
-          # Aceptar licencias
           yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses
-          
-          # Instalar plataformas necesarias
           $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
         env:
           ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
@@ -68,16 +58,13 @@ jobs:
 
       - name: Build Android APK
         run: |
-          # Limpiar y construir
           haxelib run lime clean android
           haxelib run lime build android -final -D officialBuild -v
-          
-          # Mover APK a ubicación accesible
           mkdir -p artifacts
           cp export/release/android/bin/app/build/outputs/apk/release/*.apk artifacts/
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: PsychEngine-Android
           path: artifacts/*.apk
